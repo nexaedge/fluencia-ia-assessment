@@ -1,6 +1,6 @@
 import { Chart, RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip } from "chart.js";
-import { questions, teamProfiles, type TeamProfile, getPhaseRecommendations, getDimensionInsights } from "./data";
-import { calculateResults, type AssessmentResult } from "./scoring";
+import { questions, teamProfiles, dimensions, dimensionResources, type TeamProfile, getPhaseRecommendations } from "./data";
+import { calculateResults, type AssessmentResult, type DimensionScore } from "./scoring";
 
 Chart.register(RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip);
 
@@ -20,40 +20,47 @@ const state: AppState = {
   answers: {},
 };
 
+let miniChart: Chart | null = null;
+
 const app = document.getElementById("app")!;
 
 function render() {
-  switch (state.screen) {
-    case "welcome":
-      renderWelcome();
-      break;
-    case "profile":
-      renderProfileSelector();
-      break;
-    case "question":
-      renderQuestion();
-      break;
-    case "results":
-      renderResults();
-      break;
+  // Destroy previous mini chart before re-rendering
+  if (miniChart) {
+    miniChart.destroy();
+    miniChart = null;
   }
-  window.scrollTo({ top: 0 });
+
+  switch (state.screen) {
+    case "welcome": renderWelcome(); break;
+    case "profile": renderProfileSelector(); break;
+    case "question": renderQuestion(); break;
+    case "results": renderResults(); break;
+  }
 }
 
-// --- Welcome Screen ---
+const logoUrl = new URL("/nexaedge-logo.svg", import.meta.url).href;
+
+function renderLogo(): string {
+  return `<img src="${logoUrl}" alt="NexaEdge" class="h-6 md:h-7" />`;
+}
+
+function dimIcon(svgPath: string, className = "w-5 h-5"): string {
+  return `<svg class="${className}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">${svgPath}</svg>`;
+}
+
+// ─── Welcome ───
 
 function renderWelcome() {
   app.innerHTML = `
     <div class="fade-in min-h-dvh flex flex-col">
-      <header class="px-6 py-5">
-        <div class="text-sm font-semibold tracking-wide text-brand-deep uppercase">NexaEdge</div>
-      </header>
+      <header class="px-6 py-5">${renderLogo()}</header>
 
       <main class="flex-1 flex items-center justify-center px-6">
         <div class="max-w-2xl mx-auto text-center">
           <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-light text-brand-deep text-sm font-medium mb-6">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-            Diagnóstico gratuito · 5 minutos
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Diagnóstico gratuito · 2 minutos
           </div>
           <h1 class="font-display text-4xl md:text-5xl font-bold text-brand-navy leading-tight mb-5">
             Qual o nível de<br/>
@@ -61,18 +68,18 @@ function renderWelcome() {
             da sua equipe?
           </h1>
           <p class="text-lg text-brand-muted max-w-lg mx-auto mb-10">
-            Responda 14 perguntas sobre como sua equipe usa IA no dia a dia e receba um diagnóstico personalizado com recomendações práticas.
+            6 perguntas sobre como sua equipe usa IA. Resultado imediato com diagnóstico personalizado e recursos práticos.
           </p>
           <button id="btn-start" class="inline-flex items-center gap-2 px-8 py-4 bg-brand-deep text-white font-semibold rounded-lg hover:bg-brand-navy transition-colors text-lg cursor-pointer">
             Começar diagnóstico
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
           </button>
-          <p class="text-sm text-brand-muted mt-4">Sem cadastro. Resultado imediato.</p>
+          <p class="text-sm text-brand-muted mt-4">Sem cadastro. Sem email. Resultado na hora.</p>
         </div>
       </main>
 
       <footer class="px-6 py-4 text-center text-xs text-brand-muted">
-        Baseado no framework Fluência em IA — pesquisa de Mollick, Ng, BCG, Prosci e McKinsey adaptada para PMEs brasileiras.
+        Baseado em pesquisa de Mollick, Ng, BCG, Prosci e McKinsey — adaptado para PMEs brasileiras.
       </footer>
     </div>
   `;
@@ -83,30 +90,31 @@ function renderWelcome() {
   });
 }
 
-// --- Profile Selector ---
+// ─── Profile Selector ───
 
 function renderProfileSelector() {
   app.innerHTML = `
     <div class="fade-in min-h-dvh flex flex-col">
-      ${renderHeader()}
+      <header class="px-6 py-5">${renderLogo()}</header>
 
       <main class="flex-1 flex items-center justify-center px-6 py-12">
-        <div class="max-w-xl mx-auto w-full">
-          <p class="text-sm font-medium text-brand-deep mb-2 uppercase tracking-wide">Passo 1 de 2</p>
+        <div class="max-w-md mx-auto w-full">
+          <p class="text-sm font-medium text-brand-cyan mb-2">Antes de começar</p>
           <h2 class="font-display text-2xl md:text-3xl font-bold text-brand-navy mb-2">Qual o perfil da equipe?</h2>
-          <p class="text-brand-muted mb-8">Escolha o que melhor descreve o time que será avaliado.</p>
+          <p class="text-brand-muted mb-8 text-sm">Escolha o que melhor descreve o time avaliado.</p>
 
           <div class="space-y-3" id="profile-options">
-            ${teamProfiles
-              .map(
-                (p) => `
-              <button data-profile="${p.id}" class="option-card w-full text-left border-2 border-gray-200 rounded-xl px-5 py-4 cursor-pointer bg-white">
-                <div class="font-semibold text-brand-slate">${p.label}</div>
-                <div class="text-sm text-brand-muted mt-0.5">${p.description}</div>
+            ${teamProfiles.map((p) => `
+              <button data-profile="${p.id}" class="level-card w-full text-left border-2 border-gray-200 rounded-xl px-5 py-4 bg-white flex items-center gap-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-brand-light text-brand-deep flex items-center justify-center">
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">${p.icon}</svg>
+                </div>
+                <div>
+                  <div class="font-semibold text-brand-slate">${p.label}</div>
+                  <div class="text-sm text-brand-muted">${p.description}</div>
+                </div>
               </button>
-            `
-              )
-              .join("")}
+            `).join("")}
           </div>
         </div>
       </main>
@@ -123,53 +131,75 @@ function renderProfileSelector() {
   });
 }
 
-// --- Question Screen ---
+// ─── Question Screen ───
 
 function renderQuestion() {
   const q = questions[state.currentQuestion];
   const total = questions.length;
-  const progress = ((state.currentQuestion) / total) * 100;
   const selectedValue = state.answers[q.id];
 
   app.innerHTML = `
     <div class="fade-in min-h-dvh flex flex-col">
-      ${renderHeader()}
+      <!-- Header with logo + mini radar -->
+      <header class="px-6 py-4 flex items-center justify-between border-b border-gray-100">
+        ${renderLogo()}
+        <div class="flex items-center gap-4">
+          <div class="w-16 h-16 md:w-20 md:h-20">
+            <canvas id="mini-radar"></canvas>
+          </div>
+        </div>
+      </header>
 
-      <!-- Progress bar -->
-      <div class="px-6">
-        <div class="max-w-2xl mx-auto">
-          <div class="flex items-center justify-between text-xs text-brand-muted mb-2">
-            <span>${q.dimensionLabel}</span>
-            <span>${state.currentQuestion + 1} de ${total}</span>
-          </div>
-          <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div class="progress-fill h-full bg-brand-cyan rounded-full" style="width: ${progress}%"></div>
-          </div>
+      <!-- Progress dots -->
+      <div class="px-6 py-3">
+        <div class="max-w-lg mx-auto flex items-center justify-center gap-2">
+          ${Array.from({ length: total }, (_, i) => {
+            const answered = state.answers[questions[i].id] !== undefined;
+            const current = i === state.currentQuestion;
+            let classes = "progress-dot w-2.5 h-2.5 rounded-full";
+            if (current) classes += " bg-brand-deep scale-125";
+            else if (answered) classes += " bg-brand-cyan";
+            else classes += " bg-gray-200";
+            return `<div class="${classes}"></div>`;
+          }).join("")}
         </div>
       </div>
 
-      <main class="flex-1 flex items-center justify-center px-6 py-8">
-        <div class="max-w-2xl mx-auto w-full">
-          <h2 class="font-display text-xl md:text-2xl font-bold text-brand-navy mb-6 leading-snug">${q.text}</h2>
-
-          <div class="space-y-2.5" id="question-options">
-            ${q.options
-              .map(
-                (opt, i) => `
-              <button data-value="${opt.value}" class="option-card w-full text-left border-2 ${selectedValue === opt.value ? "selected border-brand-deep bg-brand-light" : "border-gray-200 bg-white"} rounded-xl px-5 py-3.5 cursor-pointer">
-                <div class="flex items-start gap-3">
-                  <span class="flex-shrink-0 w-7 h-7 rounded-full border-2 ${selectedValue === opt.value ? "border-brand-deep bg-brand-deep text-white" : "border-gray-300 text-gray-400"} flex items-center justify-center text-xs font-semibold mt-0.5">${i}</span>
-                  <span class="text-sm md:text-base ${selectedValue === opt.value ? "text-brand-navy font-medium" : "text-brand-slate"}">${opt.label}</span>
-                </div>
-              </button>
-            `
-              )
-              .join("")}
+      <main class="flex-1 flex items-center justify-center px-6 py-6">
+        <div class="max-w-lg mx-auto w-full">
+          <!-- Dimension badge -->
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 rounded-lg bg-brand-light text-brand-deep flex items-center justify-center">
+              ${dimIcon(q.icon, "w-4 h-4")}
+            </div>
+            <span class="text-sm font-medium text-brand-deep">${q.dimensionLabel}</span>
+            <span class="text-xs text-brand-muted ml-auto">${state.currentQuestion + 1}/${total}</span>
           </div>
 
-          <div class="flex items-center justify-between mt-8">
-            <button id="btn-back" class="text-sm text-brand-muted hover:text-brand-slate transition-colors cursor-pointer ${state.currentQuestion === 0 ? "invisible" : ""}">
-              <svg class="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" /></svg>
+          <h2 class="font-display text-xl md:text-2xl font-bold text-brand-navy mb-6 leading-snug">${q.text}</h2>
+
+          <!-- Level cards -->
+          <div class="space-y-2" id="question-options">
+            ${q.options.map((opt) => {
+              const isSelected = selectedValue === opt.level;
+              return `
+                <button data-level="${opt.level}" class="level-card w-full text-left rounded-xl px-4 py-3 border-2 ${isSelected ? "selected border-brand-deep bg-brand-light" : "border-gray-200 bg-white"}">
+                  <div class="flex items-center gap-3">
+                    <div class="flex-shrink-0 w-3 h-3 rounded-full" style="background: ${opt.color}"></div>
+                    <div class="flex-1 min-w-0">
+                      <span class="font-semibold text-sm ${isSelected ? "text-brand-navy" : "text-brand-slate"}">${opt.label}</span>
+                      <span class="text-sm ${isSelected ? "text-brand-deep" : "text-brand-muted"}"> — ${opt.description}</span>
+                    </div>
+                  </div>
+                </button>
+              `;
+            }).join("")}
+          </div>
+
+          <!-- Navigation -->
+          <div class="flex items-center justify-between mt-6">
+            <button id="btn-back" class="text-sm text-brand-muted hover:text-brand-slate transition-colors cursor-pointer flex items-center gap-1 ${state.currentQuestion === 0 ? "invisible" : ""}">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" /></svg>
               Voltar
             </button>
             <div></div>
@@ -179,22 +209,32 @@ function renderQuestion() {
     </div>
   `;
 
-  document.querySelectorAll("[data-value]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const value = parseInt(btn.getAttribute("data-value")!, 10);
-      state.answers[q.id] = value;
+  // Render mini radar
+  renderMiniRadar();
 
-      // Short delay for visual feedback then advance
-      btn.classList.add("selected");
+  // Event listeners
+  document.querySelectorAll("[data-level]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const level = parseInt(btn.getAttribute("data-level")!, 10);
+      state.answers[q.id] = level;
+
+      // Visual feedback
+      document.querySelectorAll("[data-level]").forEach((b) => {
+        b.classList.remove("selected", "border-brand-deep", "bg-brand-light");
+        b.classList.add("border-gray-200", "bg-white");
+      });
+      btn.classList.add("selected", "border-brand-deep", "bg-brand-light");
+      btn.classList.remove("border-gray-200", "bg-white");
+
+      // Advance after brief delay
       setTimeout(() => {
         if (state.currentQuestion < total - 1) {
           state.currentQuestion++;
-          render();
         } else {
           state.screen = "results";
-          render();
         }
-      }, 200);
+        render();
+      }, 250);
     });
   });
 
@@ -209,23 +249,71 @@ function renderQuestion() {
   });
 }
 
-// --- Results Screen ---
+// ─── Mini Radar (during questions) ───
+
+function renderMiniRadar() {
+  const canvas = document.getElementById("mini-radar") as HTMLCanvasElement | null;
+  if (!canvas) return;
+
+  const scores = dimensions.map((d) => state.answers[d.id] ?? 0);
+
+  miniChart = new Chart(canvas, {
+    type: "radar",
+    data: {
+      labels: dimensions.map(() => ""),
+      datasets: [{
+        data: scores,
+        backgroundColor: "rgba(43, 153, 227, 0.2)",
+        borderColor: "#2B99E3",
+        borderWidth: 1.5,
+        pointBackgroundColor: "#05629F",
+        pointRadius: 2,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      animation: { duration: 300 },
+      plugins: { tooltip: { enabled: false } },
+      scales: {
+        r: {
+          min: 0,
+          max: 4,
+          ticks: { display: false },
+          grid: { color: "rgba(148, 163, 184, 0.15)" },
+          angleLines: { color: "rgba(148, 163, 184, 0.15)" },
+          pointLabels: { display: false },
+        },
+      },
+    },
+  });
+}
+
+// ─── Results Screen ───
 
 function renderResults() {
   const result = calculateResults(state.answers, state.profile!);
-  const recommendations = getPhaseRecommendations(result.fluencyLevel.level, result.profile);
-
-  const levelColors = ["#EF4444", "#F59E0B", "#F59E0B", "#2B99E3", "#05629F"];
+  const recommendations = getPhaseRecommendations(result.fluencyLevel.level);
+  const levelColors = ["#EF4444", "#F59E0B", "#EAB308", "#2B99E3", "#05629F"];
   const levelColor = levelColors[result.fluencyLevel.level];
+
+  const shareUrl = buildShareUrl();
+  const shareText = `Minha equipe é ${result.fluencyLevel.name} em fluência de IA (${result.overallScore.toFixed(1)}/4.0). Faça o diagnóstico gratuito:`;
 
   app.innerHTML = `
     <div class="fade-in min-h-dvh flex flex-col">
-      ${renderHeader()}
+      <header class="px-6 py-5 flex items-center justify-between">
+        ${renderLogo()}
+        <button id="btn-share-top" class="text-sm text-brand-deep font-medium flex items-center gap-1.5 cursor-pointer hover:text-brand-navy transition-colors">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" /></svg>
+          Compartilhar
+        </button>
+      </header>
 
-      <main class="flex-1 px-6 py-8 md:py-12">
+      <main class="flex-1 px-6 py-6 md:py-10">
         <div class="max-w-3xl mx-auto">
 
-          <!-- Level Badge -->
+          <!-- Level Hero -->
           <div class="text-center mb-10">
             <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4" style="background: ${levelColor}15; color: ${levelColor}">
               ${result.fluencyLevel.label}
@@ -236,33 +324,28 @@ function renderResults() {
             <p class="text-brand-muted max-w-lg mx-auto">${result.fluencyLevel.description}</p>
           </div>
 
-          <!-- Score + Radar Chart -->
-          <div class="grid md:grid-cols-2 gap-8 mb-12">
+          <!-- Score + Radar -->
+          <div class="grid md:grid-cols-2 gap-6 mb-10">
             <div class="bg-gray-50 rounded-2xl p-6">
               <h3 class="font-display font-semibold text-brand-navy mb-1">Score geral</h3>
-              <div class="flex items-end gap-2 mb-4">
+              <div class="flex items-end gap-2 mb-5">
                 <span class="text-5xl font-bold" style="color: ${levelColor}">${result.overallScore.toFixed(1)}</span>
                 <span class="text-brand-muted text-lg mb-1">/ 4.0</span>
               </div>
               <div class="space-y-2.5">
-                ${result.dimensionScores
-                  .map(
-                    (d) => `
+                ${result.dimensionScores.map((d) => `
                   <div>
                     <div class="flex justify-between text-sm mb-1">
                       <span class="text-brand-slate">${d.label}</span>
-                      <span class="font-medium text-brand-navy">${d.score.toFixed(1)}</span>
+                      <span class="font-medium text-brand-navy">${d.score}</span>
                     </div>
                     <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div class="h-full rounded-full bg-brand-cyan" style="width: ${(d.score / 4) * 100}%"></div>
+                      <div class="h-full rounded-full transition-all duration-500" style="width: ${(d.score / 4) * 100}%; background: ${levelColors[d.score]}"></div>
                     </div>
                   </div>
-                `
-                  )
-                  .join("")}
+                `).join("")}
               </div>
             </div>
-
             <div class="bg-gray-50 rounded-2xl p-6 flex items-center justify-center">
               <div class="chart-container w-full">
                 <canvas id="radar-chart"></canvas>
@@ -281,44 +364,47 @@ function renderResults() {
                 <p class="text-brand-muted text-sm mt-1">${result.fluencyLevel.phaseDescription}</p>
               </div>
             </div>
-            <div class="ml-13">
-              <h4 class="font-semibold text-brand-slate text-sm mb-3 uppercase tracking-wide">Recomendações práticas</h4>
-              <ul class="space-y-2">
-                ${recommendations
-                  .map(
-                    (r) => `
-                  <li class="flex items-start gap-2 text-sm text-brand-slate">
-                    <svg class="w-4 h-4 text-brand-cyan flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    ${r}
-                  </li>
-                `
-                  )
-                  .join("")}
-              </ul>
+            <ul class="space-y-2 mt-4">
+              ${recommendations.map((r) => `
+                <li class="flex items-start gap-2 text-sm text-brand-slate">
+                  <svg class="w-4 h-4 text-brand-cyan flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  ${r}
+                </li>
+              `).join("")}
+            </ul>
+          </div>
+
+          <!-- Per-dimension insights + resources -->
+          <h3 class="font-display font-semibold text-brand-navy text-lg mb-4">Diagnóstico por dimensão</h3>
+          <div class="space-y-4 mb-10">
+            ${result.dimensionScores.map((d) => renderDimensionCard(d, levelColors)).join("")}
+          </div>
+
+          <!-- Share buttons -->
+          <div class="bg-gray-50 rounded-2xl p-6 mb-8">
+            <h3 class="font-display font-semibold text-brand-navy text-center mb-2">Compartilhe com seu time</h3>
+            <p class="text-sm text-brand-muted text-center mb-5">Encaminhe o diagnóstico para colegas ou liderança</p>
+            <div class="flex flex-wrap justify-center gap-3" id="share-buttons">
+              <a href="https://wa.me/?text=${encodeURIComponent(shareText + " " + shareUrl)}" target="_blank" rel="noopener" class="share-btn inline-flex items-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-lg text-sm font-medium">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                WhatsApp
+              </a>
+              <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}" target="_blank" rel="noopener" class="share-btn inline-flex items-center gap-2 px-4 py-2.5 bg-[#0A66C2] text-white rounded-lg text-sm font-medium">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                LinkedIn
+              </a>
+              <a href="mailto:?subject=${encodeURIComponent("Diagnóstico de Fluência em IA")}&body=${encodeURIComponent(shareText + "\n\n" + shareUrl)}" class="share-btn inline-flex items-center gap-2 px-4 py-2.5 bg-brand-slate text-white rounded-lg text-sm font-medium">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+                Email
+              </a>
+              <button id="btn-copy-link" class="share-btn inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-brand-slate rounded-lg text-sm font-medium cursor-pointer">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.757 8.25" /></svg>
+                Copiar link
+              </button>
             </div>
           </div>
 
-          <!-- Dimension Insights -->
-          <div class="mb-12">
-            <h3 class="font-display font-semibold text-brand-navy text-lg mb-4">Análise por dimensão</h3>
-            <div class="grid gap-3">
-              ${result.dimensionScores
-                .map((d) => {
-                  const insight = getDimensionInsights(d.id, d.score);
-                  return `
-                    <div class="border border-gray-200 rounded-xl p-4">
-                      <div class="flex items-center justify-between mb-1">
-                        <h4 class="font-semibold text-brand-slate text-sm">${d.label}</h4>
-                        <span class="text-sm font-medium text-brand-deep">${d.score.toFixed(1)} / 4.0</span>
-                      </div>
-                      <p class="text-sm text-brand-muted">${insight}</p>
-                    </div>
-                  `;
-                })
-                .join("")}
-            </div>
-          </div>
-
+          <!-- Newsletter CTA -->
           ${renderNewsletter()}
 
           <!-- Restart -->
@@ -333,6 +419,8 @@ function renderResults() {
   `;
 
   renderRadarChart(result);
+  setupShareButtons(shareUrl);
+  setupNewsletter();
 
   document.getElementById("btn-restart")?.addEventListener("click", () => {
     state.screen = "welcome";
@@ -341,11 +429,66 @@ function renderResults() {
     state.answers = {};
     render();
   });
-
-  setupNewsletter();
 }
 
-// --- Radar Chart ---
+// ─── Dimension Card (with resources) ───
+
+function renderDimensionCard(d: DimensionScore, levelColors: string[]): string {
+  const res = dimensionResources[d.id];
+  if (!res) return "";
+
+  const tier = d.score < 1.5 ? "low" : d.score < 3 ? "mid" : "high";
+  const data = res[tier];
+
+  const typeIcons: Record<string, string> = {
+    article: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25H5.625a2.25 2.25 0 01-2.25-2.25V6.375c0-.621.504-1.125 1.125-1.125h3.375" />',
+    video: '<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />',
+    guide: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />',
+    tool: '<path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17l-5.658 5.659a2.25 2.25 0 01-3.182-3.182l5.659-5.658m0 0a6.002 6.002 0 018.439-2.474c.256.165.497.35.719.557" />',
+  };
+
+  return `
+    <div class="border border-gray-200 rounded-2xl overflow-hidden">
+      <!-- Header -->
+      <div class="px-5 py-4 flex items-center justify-between bg-white">
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 rounded-full" style="background: ${levelColors[d.score]}"></div>
+          <h4 class="font-semibold text-brand-slate">${d.label}</h4>
+        </div>
+        <span class="text-sm font-medium" style="color: ${levelColors[d.score]}">${d.score} / 4</span>
+      </div>
+
+      <!-- Insight -->
+      <div class="px-5 py-3 bg-gray-50 border-t border-gray-100">
+        <p class="text-sm text-brand-muted">${data.insight}</p>
+      </div>
+
+      <!-- Resources -->
+      ${data.resources.length > 0 ? `
+        <div class="px-5 py-4 border-t border-gray-100 bg-white">
+          <p class="text-xs font-semibold text-brand-deep uppercase tracking-wide mb-3">Leitura recomendada</p>
+          <div class="space-y-2.5">
+            ${data.resources.map((r) => `
+              <a href="${r.url}" target="_blank" rel="noopener" class="resource-card block border border-gray-100 rounded-lg px-3.5 py-2.5 no-underline">
+                <div class="flex items-start gap-2.5">
+                  <div class="flex-shrink-0 w-7 h-7 rounded-md bg-brand-light text-brand-deep flex items-center justify-center mt-0.5">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">${typeIcons[r.type] || typeIcons.article}</svg>
+                  </div>
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-brand-slate">${r.title}</div>
+                    <div class="text-xs text-brand-muted mt-0.5">${r.description}</div>
+                  </div>
+                </div>
+              </a>
+            `).join("")}
+          </div>
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+// ─── Radar Chart (results page) ───
 
 function renderRadarChart(result: AssessmentResult) {
   const canvas = document.getElementById("radar-chart") as HTMLCanvasElement | null;
@@ -355,22 +498,19 @@ function renderRadarChart(result: AssessmentResult) {
     type: "radar",
     data: {
       labels: result.dimensionScores.map((d) => {
-            // Wrap long labels into two lines for radar chart readability
-            const parts = d.label.split(" & ");
-            return parts.length > 1 ? parts : d.label;
-          }),
-      datasets: [
-        {
-          data: result.dimensionScores.map((d) => d.score),
-          backgroundColor: "rgba(43, 153, 227, 0.15)",
-          borderColor: "#2B99E3",
-          borderWidth: 2,
-          pointBackgroundColor: "#05629F",
-          pointBorderColor: "#fff",
-          pointBorderWidth: 2,
-          pointRadius: 5,
-        },
-      ],
+        const parts = d.label.split(" & ");
+        return parts.length > 1 ? parts : d.label;
+      }),
+      datasets: [{
+        data: result.dimensionScores.map((d) => d.score),
+        backgroundColor: "rgba(43, 153, 227, 0.15)",
+        borderColor: "#2B99E3",
+        borderWidth: 2,
+        pointBackgroundColor: "#05629F",
+        pointBorderColor: "#fff",
+        pointBorderWidth: 2,
+        pointRadius: 5,
+      }],
     },
     options: {
       responsive: true,
@@ -378,7 +518,7 @@ function renderRadarChart(result: AssessmentResult) {
       plugins: {
         tooltip: {
           callbacks: {
-            label: (ctx) => `${ctx.parsed.r.toFixed(1)} / 4.0`,
+            label: (ctx) => `${ctx.parsed.r} / 4`,
           },
         },
       },
@@ -386,21 +526,11 @@ function renderRadarChart(result: AssessmentResult) {
         r: {
           min: 0,
           max: 4,
-          ticks: {
-            stepSize: 1,
-            display: false,
-          },
-          grid: {
-            color: "rgba(148, 163, 184, 0.2)",
-          },
-          angleLines: {
-            color: "rgba(148, 163, 184, 0.2)",
-          },
+          ticks: { stepSize: 1, display: false },
+          grid: { color: "rgba(148, 163, 184, 0.2)" },
+          angleLines: { color: "rgba(148, 163, 184, 0.2)" },
           pointLabels: {
-            font: {
-              family: "Inter",
-              size: 11,
-            },
+            font: { family: "Inter", size: 11 },
             color: "#1E293B",
           },
         },
@@ -409,28 +539,62 @@ function renderRadarChart(result: AssessmentResult) {
   });
 }
 
-// --- Newsletter CTA ---
+// ─── Share ───
+
+function buildShareUrl(): string {
+  const base = window.location.origin + window.location.pathname;
+  return base;
+}
+
+function setupShareButtons(shareUrl: string) {
+  document.getElementById("btn-copy-link")?.addEventListener("click", () => {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      const btn = document.getElementById("btn-copy-link");
+      if (btn) {
+        btn.innerHTML = `
+          <svg class="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          Copiado!
+        `;
+        setTimeout(() => {
+          btn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.757 8.25" /></svg>
+            Copiar link
+          `;
+        }, 2000);
+      }
+    });
+  });
+
+  // Top share button uses native share API if available, else scrolls to share section
+  document.getElementById("btn-share-top")?.addEventListener("click", () => {
+    if (navigator.share) {
+      navigator.share({
+        title: "Diagnóstico de Fluência em IA",
+        text: "Descubra o nível de fluência em IA da sua equipe",
+        url: shareUrl,
+      }).catch(() => {});
+    } else {
+      document.getElementById("share-buttons")?.scrollIntoView({ behavior: "smooth" });
+    }
+  });
+}
+
+// ─── Newsletter ───
 
 function renderNewsletter(): string {
   return `
     <div class="bg-brand-navy rounded-2xl p-6 md:p-8 text-white">
       <div class="max-w-lg mx-auto text-center">
         <h3 class="font-display font-bold text-xl mb-2">Receba conteúdo sobre fluência em IA</h3>
-        <p class="text-white/70 text-sm mb-6">Estratégias práticas para times que querem sair do nível experimental. Sem spam, sem enrolação.</p>
+        <p class="text-white/70 text-sm mb-6">Estratégias práticas para times que querem sair do experimental. Sem spam.</p>
         <form id="newsletter-form" class="flex flex-col sm:flex-row gap-3">
-          <input
-            type="email"
-            id="newsletter-email"
-            placeholder="seu@email.com"
-            required
-            class="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder:text-white/40 text-sm focus:outline-none focus:border-brand-cyan"
-          />
+          <input type="email" id="newsletter-email" placeholder="seu@email.com" required
+            class="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder:text-white/40 text-sm focus:outline-none focus:border-brand-cyan" />
           <button type="submit" class="px-6 py-3 bg-brand-cyan text-white font-semibold rounded-lg hover:bg-brand-deep transition-colors text-sm whitespace-nowrap cursor-pointer">
             Quero receber
           </button>
         </form>
-        <p id="newsletter-success" class="text-brand-cyan text-sm mt-3 hidden">Inscrito com sucesso! Fique de olho no email.</p>
-        <p id="newsletter-error" class="text-red-400 text-sm mt-3 hidden"></p>
+        <p id="newsletter-success" class="text-brand-cyan text-sm mt-3 hidden">Inscrito com sucesso!</p>
       </div>
     </div>
   `;
@@ -445,8 +609,6 @@ function setupNewsletter() {
     const email = (document.getElementById("newsletter-email") as HTMLInputElement).value;
     if (!email) return;
 
-    // For now, store in localStorage and show success
-    // TODO: Replace with real newsletter API (ConvertKit, Mailchimp, etc.)
     const subscribers = JSON.parse(localStorage.getItem("nexaedge-newsletter") || "[]");
     subscribers.push({ email, date: new Date().toISOString(), source: "fluencia-ia-assessment" });
     localStorage.setItem("nexaedge-newsletter", JSON.stringify(subscribers));
@@ -456,18 +618,7 @@ function setupNewsletter() {
   });
 }
 
-// --- Shared Components ---
-
-function renderHeader(): string {
-  return `
-    <header class="px-6 py-5 flex items-center justify-between">
-      <div class="text-sm font-semibold tracking-wide text-brand-deep uppercase">NexaEdge</div>
-      <div class="text-xs text-brand-muted">Diagnóstico de Fluência em IA</div>
-    </header>
-  `;
-}
-
-// --- Init ---
+// ─── Init ───
 
 export function init() {
   render();
