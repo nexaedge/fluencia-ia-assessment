@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Poppins", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-deep: #05629F;
+  --color-brand-cyan: #2B99E3;
+  --color-brand-navy: #062A42;
+  --color-brand-slate: #1E293B;
+  --color-brand-muted: #94A3B8;
+  --color-brand-light: #EBF5FF;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+#app {
+  min-height: 100dvh;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.progress-fill {
+  transition: width 0.4s ease-in-out;
+}
+
+.option-card {
+  transition: all 0.15s ease;
+}
+.option-card:hover {
+  border-color: var(--color-brand-cyan);
+  background-color: var(--color-brand-light);
+}
+.option-card.selected {
+  border-color: var(--color-brand-deep);
+  background-color: var(--color-brand-light);
+}
+
+.chart-container {
+  max-width: 380px;
+  margin: 0 auto;
+}
