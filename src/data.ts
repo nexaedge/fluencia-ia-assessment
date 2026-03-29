@@ -254,7 +254,7 @@ export const dimensionResources: Record<string, DimensionResources> = {
         {
           title: "Cointeligência — Ethan Mollick (livro em pt-BR)",
           description: "O livro que define como pensar sobre IA como parceira, não ferramenta. Traduzido pela Intrínseca em 2025.",
-          url: "https://www.amazon.com.br/Cointelig%C3%AAncia-vida-trabalho-com-IA-ebook/dp/B0F3XTMRX9",
+          url: "https://loja.intrinseca.com.br/cointeligencia-a-vida-e-o-trabalho-com-ia",
           type: "article",
         },
         {
@@ -292,10 +292,10 @@ export const dimensionResources: Record<string, DimensionResources> = {
       insight: "Bom nível de uso. O desafio agora é mapear a fronteira com precisão e manter o time atualizado conforme novas ferramentas surgem.",
       resources: [
         {
-          title: "Biblioteca de prompts — Inner AI",
-          description: "250+ prompts otimizados para o mercado brasileiro, organizados por área com boas práticas de PromptOps.",
-          url: "https://blog.innerai.com/accessibility-and-ease-of-use-biblioteca-de-prompts-brasileiros/",
-          type: "tool",
+          title: "Engenharia de prompts: técnicas e boas práticas — Alura",
+          description: "Guia completo sobre como escrever bons prompts para IA. Técnicas práticas para maximizar resultados.",
+          url: "https://www.alura.com.br/artigos/engenharia-prompt",
+          type: "guide",
         },
         {
           title: "IA realmente aumenta a produtividade? — Exame",
@@ -441,7 +441,7 @@ export const dimensionResources: Record<string, DimensionResources> = {
         {
           title: "Introdução ao Claude — Documentação oficial em pt-BR",
           description: "Documentação oficial da Anthropic em português. Como conectar seus dados a modelos de linguagem.",
-          url: "https://docs.anthropic.com/pt/docs/intro-to-claude",
+          url: "https://platform.claude.com/docs/pt-BR/get-started",
           type: "guide",
         },
       ],
@@ -452,10 +452,10 @@ export const dimensionResources: Record<string, DimensionResources> = {
       insight: "Conhecimento tácito é o maior gargalo. Se está na cabeça das pessoas, IA não pode acessar. Comece documentando o contexto mais crítico.",
       resources: [
         {
-          title: "Biblioteca de prompts brasileiros — Inner AI",
-          description: "250+ prompts organizados por área (marketing, jurídico, acadêmico) com versionamento e boas práticas.",
-          url: "https://blog.innerai.com/accessibility-and-ease-of-use-biblioteca-de-prompts-brasileiros/",
-          type: "tool",
+          title: "Engenharia de prompts: como escrever bons comandos — Alura",
+          description: "Guia prático de engenharia de prompts. Técnicas para criar instruções eficazes para IA.",
+          url: "https://www.alura.com.br/artigos/engenharia-prompt",
+          type: "guide",
         },
         {
           title: "TJSC publica biblioteca de prompts institucional",
@@ -480,10 +480,10 @@ export const dimensionResources: Record<string, DimensionResources> = {
       insight: "O 'grimório' do time é um ativo valioso. Mantenha-o atualizado e revise quando novos modelos surgem.",
       resources: [
         {
-          title: "Engenharia de prompts acessível — Inner AI",
-          description: "Boas práticas de PromptOps: como versionar, organizar e atualizar sua biblioteca de prompts.",
-          url: "https://blog.innerai.com/accessibility-and-ease-of-use-biblioteca-de-prompts-brasileiros/",
-          type: "guide",
+          title: "Biblioteca de prompts do TJSC — exemplo institucional",
+          description: "Tribunal de Justiça de SC publicou sua biblioteca de prompts. Exemplo real de como institucionalizar o uso de IA.",
+          url: "https://www.tjsc.jus.br/web/imprensa/-/tjsc-disponibiliza-biblioteca-de-prompts-para-simplificar-uso-de-ia-nos-processos",
+          type: "article",
         },
       ],
     },
